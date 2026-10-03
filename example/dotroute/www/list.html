@@ -2,7 +2,7 @@
 <div class="uk-overflow-auto">
     <form class="uk-grid-small" uk-grid onsubmit="return false;">
         <div>
-            <button type="button" OnClick="DRApp.go('{{! DRApp.current.controller.model.singular }}_create')" class="uk-button uk-button-primary">
+            <button type="button" OnClick="DRApp.go('{{! DRApp.current.controller.model.key }}_create')" class="uk-button uk-button-primary">
                 Create
             </button>
         </div>
@@ -27,7 +27,7 @@
 {{~it[DRApp.current.controller.model.plural] :model}}
             <tr
     {{? DRApp.current.controller.model.id }}
-            OnClick="DRApp.go('{{! DRApp.current.controller.model.singular }}_retrieve','{{=model[DRApp.current.controller.model.id]}}')" class="clickable"
+            OnClick="DRApp.go('{{! DRApp.current.controller.model.key }}_retrieve','{{=model[DRApp.current.controller.model.id]}}')" class="clickable"
     {{?}}
             >
     {{~DRApp.current.controller.model.list :field}}

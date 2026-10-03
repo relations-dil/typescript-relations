@@ -17,7 +17,7 @@ NPM=-v ${PWD}/LICENSE:/opt/service/LICENSE \
 	-v ${PWD}/README.md:/opt/service/README.md
 NPMRC=$(shell test -f ${HOME}/.npmrc && echo "-v ${HOME}/.npmrc:/root/.npmrc")
 
-.PHONY: version local single stop build shell debug test lint setup tag untag pack publish example
+.PHONY: check-single version local single stop build shell debug test lint setup tag untag pack publish example
 
 build:
 	docker build . -t $(ACCOUNT)/$(IMAGE):$(VERSION)
@@ -75,3 +75,6 @@ local: single
 
 version:
 	docker run $(TTY) $(VOLUMES) $(ACCOUNT)/$(IMAGE):$(VERSION) npm version $(VERSION) --no-git-tag-version --allow-same-version
+
+check-single: single
+	docker run --rm $(TTY) $(VOLUMES) $(ACCOUNT)/$(IMAGE):$(VERSION) node example/single/check.mjs

@@ -30,18 +30,24 @@ DRApp.http = async function(type, url, data) {
 
 // ---------------------------------------------------------------- local
 
-DRApp.local = function(classes) {
+// apps is { <app>: { <model>: Class, ... }, ... }. Each app's models are addressed as
+// api/<app>/<model>, so two apps can each have a model of the same name.
+DRApp.local = function(apps) {
 
     var resources = {};
 
-    Object.values(classes).forEach(function(cls) {
-        var thy = cls.thy();
-        resources[thy.NAME] = {
-            cls: cls,
-            thy: thy,
-            singular: thy.NAME,
-            plural: thy.NAME + 's'
-        };
+    Object.keys(apps).forEach(function(app) {
+        Object.values(apps[app]).forEach(function(cls) {
+            var thy = cls.thy();
+            resources[app + "/" + thy.NAME] = {
+                app: app,
+                cls: cls,
+                thy: thy,
+                singular: thy.NAME,
+                plural: thy.NAME + 's',
+                endpoint: app + "/" + thy.NAME
+            };
+        });
     });
 
     // What goes over the wire is JSON: sets become sorted lists, nothing is shared by reference.
@@ -160,6 +166,8 @@ DRApp.local = function(classes) {
         if (path[0] == "model") {
             return [200, {models: Object.values(resources).map(function(resource) {
                 return {
+                    app: resource.app,
+                    endpoint: resource.endpoint,
                     id: resource.thy._id,
                     titles: resource.thy._titles,
                     title: resource.thy.TITLE || resource.thy.define().title || resource.singular.charAt(0).toUpperCase() + resource.singular.slice(1),
@@ -170,12 +178,12 @@ DRApp.local = function(classes) {
             })}];
         }
 
-        var resource = resources[path[0]];
-        var id = path.length > 1 ? path[1] : null;
+        var resource = resources[path[0] + "/" + path[1]];
+        var id = path.length > 2 ? path[2] : null;
         var json = data || {};
 
         if (!resource) {
-            return [404, {message: "unknown model " + path[0]}];
+            return [404, {message: "unknown model " + path.slice(0, 2).join("/")}];
         }
 
         var lookup = function() {

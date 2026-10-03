@@ -95,9 +95,9 @@ DRApp.controller("Model", "Base", {
     model: null,
     url: function(params) {
         if (params && Object.keys(params).length) {
-            return "api/" + this.model.singular + "?" + $.param(params);
+            return "api/" + this.model.endpoint + "?" + $.param(params);
         } else {
-            return "api/" + this.model.singular;
+            return "api/" + this.model.endpoint;
         }
     },
     id_url: function() {
@@ -105,9 +105,9 @@ DRApp.controller("Model", "Base", {
     },
     route: function(action, id) {
         if (id) {
-            DRApp.go(this.model.singular + "_" + action, id);
+            DRApp.go(this.model.key + "_" + action, id);
         } else {
-            DRApp.go(this.model.singular + "_" + action);
+            DRApp.go(this.model.key + "_" + action);
         }
     },
     list: DRApp.async(async function() {
@@ -251,6 +251,7 @@ DRApp.partial("Form", DRApp.load("form"));
 DRApp.partial("Footer", DRApp.load("footer"));
 
 DRApp.template("Home", DRApp.load("home"), null, DRApp.partials);
+DRApp.template("App", DRApp.load("app"), null, DRApp.partials);
 DRApp.template("Fields", DRApp.load("fields"), null, DRApp.partials);
 DRApp.template("List", DRApp.load("list"), null, DRApp.partials);
 DRApp.template("Create", DRApp.load("create"), null, DRApp.partials);
@@ -259,16 +260,22 @@ DRApp.template("Update", DRApp.load("update"), null, DRApp.partials);
 
 DRApp.model = function(model) {
 
-    DRApp.controller(model.title, "Model", {
+    // Models are addressed by app and name: /<app>/<model>. The key names their routes and
+    // controller, so two apps can each have a model called the same thing.
+    model.key = model.app + "_" + model.singular;
+
+    var path = "/" + model.app + "/" + model.singular;
+
+    DRApp.controller(model.key, "Model", {
         model: model
     });
 
-    DRApp.route(model.singular + "_list", "/" + model.singular, "List", model.title, "list");
-    DRApp.route(model.singular + "_create", "/" + model.singular + "/create", "Create", model.title, "create");
+    DRApp.route(model.key + "_list", path, "List", model.key, "list");
+    DRApp.route(model.key + "_create", path + "/create", "Create", model.key, "create");
 
     if (model.id) {
-        DRApp.route(model.singular + "_retrieve", "/" + model.singular + "/{id:^\\d+$}", "Retrieve", model.title, "retrieve");
-        DRApp.route(model.singular + "_update", "/" + model.singular + "/{id:^\\d+$}/update", "Update", model.title, "update");
+        DRApp.route(model.key + "_retrieve", path + "/{id:^\\d+$}", "Retrieve", model.key, "retrieve");
+        DRApp.route(model.key + "_update", path + "/{id:^\\d+$}/update", "Update", model.key, "update");
     }
 
 };
@@ -276,7 +283,7 @@ DRApp.model = function(model) {
 DRApp.attach = function() {
 
     for (var model = 0; model < DRApp.models.length; model++) {
-        if (!DRApp.controllers[DRApp.models[model].name]) {
+        if (!DRApp.controllers[DRApp.models[model].app + "_" + DRApp.models[model].singular]) {
             DRApp.model(DRApp.models[model]);
         }
     }

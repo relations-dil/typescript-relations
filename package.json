@@ -1,6 +1,6 @@
 {
   "name": "@relations-dil/relations",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A simple, flexible DIL (data interface layer). Define models once, independent of backend; set the source at runtime.",
   "license": "MIT",
   "repository": {
@@ -35,6 +35,10 @@
       "types": "./dist/local.d.ts",
       "default": "./dist/local.js"
     },
+    "./rest": {
+      "types": "./dist/rest.d.ts",
+      "default": "./dist/rest.js"
+    },
     "./overscore": {
       "types": "./dist/overscore.d.ts",
       "default": "./dist/overscore.js"
@@ -66,6 +70,7 @@
     "@unum-pillars/uikit": "^0.1.0",
     "esbuild": "^0.25.12",
     "eslint": "^9.39.5",
+    "jsdom": "^24.1.3",
     "tsx": "^4.23.15",
     "typescript": "^5.6.0",
     "typescript-eslint": "^8.71.0"

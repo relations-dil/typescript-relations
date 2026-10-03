@@ -2,14 +2,17 @@
 // templates and the app, all inlined. Open it from disk - no server, no install - and it keeps
 // its data in the browser's localStorage.
 //
-// Run with `make single`. The result is example/single/app.html.
+// Run with `make single`. The result is example/single/app.html, which loads every app's data from
+// the file next to it, data.js, and writes it back when you save (see persist.js). Pass a name
+// (`node build.mjs unum`) to get unum.html instead; the data file is always data.js.
 
-import { readFile, writeFile } from 'node:fs/promises'
+import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { build } from 'esbuild'
 
 const www = new URL('../dotroute/www/', import.meta.url)
 const uikit = new URL('../../node_modules/@unum-pillars/uikit/dist/', import.meta.url)
-const out = new URL('./app.html', import.meta.url)
+const name = process.argv[2] ?? 'app'
+const out = new URL(`./${name}.html`, import.meta.url)
 
 const text = (base, path) => readFile(new URL(path, base), 'utf8')
 
@@ -28,7 +31,10 @@ const bundle = await build({
   logLevel: 'warning'
 })
 
-const views = ['header', 'footer', 'home', 'form', 'fields', 'list', 'create', 'retrieve', 'update']
+const views = ['header', 'footer', 'home', 'app', 'form', 'fields', 'list', 'create', 'retrieve', 'update']
+
+// Every app's models file, in name order.
+const models = (await readdir(new URL('models/', www))).filter((file) => file.endsWith('.js')).sort()
 
 const scripts = [
   ['uikit', await text(uikit, 'js/uikit.min.js')],
@@ -37,7 +43,10 @@ const scripts = [
   ['doT', await text(www, 'js/doT.js')],
   ['doTRoute', await text(www, 'js/doTRoute.js')],
   ['relations-dil', bundle.outputFiles[0].text],
-  ['models', await text(www, 'js/models.js')],
+  ['persist', await text(www, 'js/persist.js')],
+  ['unum', await text(www, 'js/unum.js')],
+  ['apps', await text(www, 'app.js')],
+  ...(await Promise.all(models.map(async (file) => [`models/${file}`, await text(www, `models/${file}`)]))),
   ['relations', await text(www, 'js/relations.js')],
   ['api', await text(www, 'js/api.js')],
   ['service', await text(www, 'js/service.js')]
@@ -57,7 +66,7 @@ ${await text(www, 'css/relations.css')}
 <body>
 ${(await Promise.all(views.map(async (view) =>
   `<script type="text/x-dot" id="template-${view}">\n${inline(await text(www, `${view}.html`))}</script>`))).join('\n')}
-<script>window.STORAGE_KEY = 'relations-dil-example'</script>
+<script src="data.js" onerror="this.remove()"></script>
 ${scripts.map(([name, code]) => `<script>/* ${name} */\n${inline(code)}\n</script>`).join('\n')}
 </body>
 </html>

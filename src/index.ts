@@ -102,6 +102,8 @@ export { MockQuery, MockSource } from './mock.js'
 
 export { LocalSource, type StorageLike } from './local.js'
 
+export { RestSource, type FetchInit, type FetchLike, type FetchResponse } from './rest.js'
+
 export {
   fields,
   type Listed,

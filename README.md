@@ -781,7 +781,7 @@ Instance: `filter()`, `sort()`, `limit()`, `set()`, `add()`, `queue()`, `export(
 ### Sources
 
 `Source` (subclass this), `MockSource` (in-memory, complete), `LocalSource` (the same, kept in the
-browser's `localStorage`), `register()`, `source()`, `unregister()`, `clear()`, `SOURCES`.
+browser's `localStorage`), `RestSource` (a relations-restx API as the backend), `register()`, `source()`, `unregister()`, `clear()`, `SOURCES`.
 
 #### LocalSource
 
@@ -799,6 +799,46 @@ It loads once when it's made and saves after every write that succeeds, as plain
 open on the same key don't see each other's changes; whichever saves last wins, and `reset()`
 forgets everything. If what's in storage isn't valid JSON it refuses to start, rather than
 overwrite it.
+
+#### RestSource
+
+For models whose data lives behind a [relations-restx](https://github.com/relations-dil/python-relations-restx)
+API: swap `MockSource` or `LocalSource` for it at runtime and the same models read and write the
+remote service. It's a port of python-relations-rest, and it runs in the browser or in Node.
+
+```ts
+import { RestSource } from '@relations-dil/relations/rest'
+
+new RestSource('example', { url: 'https://api.example.com' })
+
+const unit = await Unit.one({ name: 'yep' }).retrieve()   // POST https://api.example.com/unit
+```
+
+Options:
+
+- `url` (required): where the API lives. `''` is fine for the same origin.
+- `fetch`: anything shaped like `fetch`. Defaults to `globalThis.fetch`, so pass one in on older
+  Node or to stand in for the network in tests.
+- `headers`: sent on every request, e.g. `{ Authorization: 'Bearer ...' }`. Requests have a JSON
+  body and `Content-Type: application/json`; a header of your own wins.
+- `credentials`: passed through to fetch, e.g. `'include'` to send cookies cross-origin.
+- `request`: anything else to hand fetch on every request, like `mode` or `cache`.
+
+A model's `SINGULAR`, `PLURAL` and `ENDPOINT` (defaulting to its name, the name plus `s`, and its
+name) say how it's addressed, just as in the Python client. The endpoint is `/<ENDPOINT>`, and by
+id `/<ENDPOINT>/<id>`.
+
+Reads are sent as `POST /<endpoint>` with a `{"filter": ...}` body, not GET. Browsers can't send a
+body with a GET, and relations-restx treats a POST that carries a `filter` exactly like a GET, so
+`filter`, `sort`, `limit` and `count` all work. Creates are `POST {plural: [...]}`, updates by id
+are `PATCH /<endpoint>/<id>` with `{singular: {...}}`, mass updates are `PATCH /<endpoint>` with
+`{filter, plural: {...}}`, and deletes are `DELETE /<endpoint>` with `{filter}`.
+
+A response of 400 or more throws a `ModelError` carrying the API's `message` (or `API Error`). An
+`overflow` in a response is carried onto the model. Sets go over as sorted lists. Like the Python
+client, it never asks the API for more than the model's `limit()`, but restx always applies one
+itself (the server model's `CHUNK`, 100 unless set), so a retrieve with no `limit()` returns at most
+that many and sets `overflow` when it got that many.
 
 ### Migrations and data
 

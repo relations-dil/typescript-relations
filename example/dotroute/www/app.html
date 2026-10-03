@@ -1,0 +1,12 @@
+{{#def.Header}}
+
+<div class="uk-overflow-auto">
+    <h2>{{= it.app.title }}</h2>
+    <ul class="uk-list uk-list-divider">
+{{~ it.app.models :model}}
+        <li><a href="{{=DRApp.link(model.key + '_list')}}">{{= model.title }}</a></li>
+{{~}}
+    </ul>
+</div>
+
+{{#def.Footer}}

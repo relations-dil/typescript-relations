@@ -5,6 +5,14 @@ All notable changes to this project are recorded here, newest first. Format foll
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-02
+
+### Added
+- The example is laid out as a list of apps: `app.js` lists them (name, title, models file, source, seed), `models/<app>.js` holds each app's models and relations (source-agnostic; the source is named for the app), and `js/unum.js` is the host that builds the apps, makes their sources, seeds an empty one and starts the screens. Screens are routed by app, `/<app>/<model>` (`#/example/unit`), with an app page at `/<app>`, a nav of apps with their models in dropdowns and a home page listing the apps, so two apps can each have a model of the same name; the access function addresses models as `api/<app>/<model>`, and routes, route names and controllers are keyed `<app>_<model>`. `make dotroute` loads the models file with a script tag; `make single` inlines `app.js` and every `models/*.js`.
+- Single-file pages keep **every app's data** in one file next to the page: `app.html` loads `data.js` (a plain `<script src>`, which works from `file://`) on open, and **Save to data.js** (or Cmd/Ctrl-S) writes it back, in place after one pick in Chromium (File System Access API) or as a download elsewhere. `localStorage` stays the working copy, one key per app (`relations:<app>`); one revision covers the whole file and decides whether the file or the browser is newer, and the page asks when both changed. Apps in the file that aren't running here are kept on save. A chip shows saved or unsaved, and leaving with unsaved changes asks first. Code in `example/dotroute/www/js/persist.js`; `make check-single` runs 14 jsdom checks of the rules.
+- `RestSource` (`@relations-dil/relations/rest`, also exported from the index): a source that uses a relations-restx API as its backend, a port of python-relations-rest. It takes `url`, and optionally `fetch`, `headers`, `credentials` and `request`, and works in the browser or in Node. Reads go as `POST /<endpoint>` with a `{"filter": ...}` body (which restx treats as a GET), since browsers can't send a body with a GET. Errors from the API throw a `ModelError` with its message.
+- `test/restx-fake.ts`: an in-process relations-restx API (a `fetch` over MockSource-backed models) the `RestSource` tests run against, with no network.
+
 ## [0.2.0] - 2026-10-02
 
 ### Added
