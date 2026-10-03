@@ -1,7 +1,7 @@
 ACCOUNT=gaf3
 IMAGE=typescript-relations
 INSTALL=node:22.9.0-alpine3.20
-VERSION?=0.1.0
+VERSION?=$(shell cat VERSION)
 DEBUG_PORT=9229
 PORT?=8483
 TTY=$(shell if tty -s; then echo "-it"; fi)
@@ -15,15 +15,15 @@ VOLUMES=-v ${PWD}/src:/opt/service/src \
 		-v ${PWD}/eslint.config.js:/opt/service/eslint.config.js
 NPM=-v ${PWD}/LICENSE:/opt/service/LICENSE \
 	-v ${PWD}/README.md:/opt/service/README.md
-NPMRC=-v ${HOME}/.npmrc:/root/.npmrc
+NPMRC=$(shell test -f ${HOME}/.npmrc && echo "-v ${HOME}/.npmrc:/root/.npmrc")
 
-.PHONY: stop build shell debug test lint setup tag untag pack publish example
+.PHONY: version local single stop build shell debug test lint setup tag untag pack publish example
 
 build:
 	docker build . -t $(ACCOUNT)/$(IMAGE):$(VERSION)
 
 shell:
-	docker run $(TTY) $(VOLUMES) -p 127.0.0.1:$(DEBUG_PORT):9229 $(ACCOUNT)/$(IMAGE):$(VERSION) sh
+	docker run $(TTY) $(VOLUMES) $(NPMRC) -p 127.0.0.1:$(DEBUG_PORT):9229 $(ACCOUNT)/$(IMAGE):$(VERSION) sh
 
 debug:
 	docker run $(TTY) $(VOLUMES) -p 127.0.0.1:$(DEBUG_PORT):9229 $(ACCOUNT)/$(IMAGE):$(VERSION) sh -c "node --import tsx --inspect-brk=0.0.0.0:9229 --test test/*.test.ts"
@@ -52,17 +52,26 @@ untag:
 	git push origin ":refs/tags/$(VERSION)"
 
 pack:
-	docker run $(TTY) $(VOLUMES) $(NPM) $(ACCOUNT)/$(IMAGE):$(VERSION) sh -c "npm run build && npm pack --dry-run"
+	docker run $(TTY) $(VOLUMES) $(NPM) $(ACCOUNT)/$(IMAGE):$(VERSION) sh -c "npm version $(VERSION) --no-git-tag-version --allow-same-version >/dev/null && npm run build && npm pack --dry-run"
 
 publish:
 	@test -f ${HOME}/.npmrc || (echo "no ${HOME}/.npmrc to publish with" && exit 1)
-	docker run $(TTY) $(VOLUMES) $(NPM) $(NPMRC) $(ACCOUNT)/$(IMAGE):$(VERSION) sh -c "npm run build && npm publish --access public"
+	docker run $(TTY) $(VOLUMES) $(NPM) $(NPMRC) $(ACCOUNT)/$(IMAGE):$(VERSION) sh -c "npm version $(VERSION) --no-git-tag-version --allow-same-version >/dev/null && npm run build && npm publish --access public"
 
 .PHONY: dotroute
 
 dotroute:
 	-@docker rm -f typescript-relations-dotroute >/dev/null 2>&1
-	docker run --rm --init --name typescript-relations-dotroute $(TTY) $(VOLUMES) -e PUBLIC_PORT=$(PORT) -p 127.0.0.1:$(PORT):8080 $(ACCOUNT)/$(IMAGE):$(VERSION) sh -c "mkdir -p example/dotroute/www/vendor && cp node_modules/@unum-pillars/uikit/dist/css/uikit.min.css node_modules/@unum-pillars/uikit/dist/js/uikit.min.js node_modules/@unum-pillars/uikit/dist/js/uikit-icons.min.js example/dotroute/www/vendor/ && npx --yes esbuild src/index.ts --bundle --format=iife --global-name=Relations --platform=browser --alias:node:fs/promises=./example/dotroute/stub.js --alias:node:path=./example/dotroute/stub.js --outfile=example/dotroute/www/js/relations-dil.js && node example/dotroute/serve.mjs"
+	docker run --rm --init --name typescript-relations-dotroute $(TTY) $(VOLUMES) -e PUBLIC_PORT=$(PORT) -p 127.0.0.1:$(PORT):8080 $(ACCOUNT)/$(IMAGE):$(VERSION) sh -c "mkdir -p example/dotroute/www/vendor && cp node_modules/@unum-pillars/uikit/dist/css/uikit.min.css node_modules/@unum-pillars/uikit/dist/js/uikit.min.js node_modules/@unum-pillars/uikit/dist/js/uikit-icons.min.js example/dotroute/www/vendor/ && npx esbuild src/index.ts --bundle --format=iife --global-name=Relations --platform=browser --external:node:* --outfile=example/dotroute/www/js/relations-dil.js && node example/dotroute/serve.mjs"
 
 stop:
 	-docker rm -f typescript-relations-dotroute
+
+single:
+	docker run --rm $(TTY) $(VOLUMES) $(ACCOUNT)/$(IMAGE):$(VERSION) node example/single/build.mjs
+
+local: single
+	@open example/single/app.html 2>/dev/null || xdg-open example/single/app.html
+
+version:
+	docker run $(TTY) $(VOLUMES) $(ACCOUNT)/$(IMAGE):$(VERSION) npm version $(VERSION) --no-git-tag-version --allow-same-version

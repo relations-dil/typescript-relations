@@ -126,3 +126,8 @@ export function underscore(name: string): string {
 
   return parts.join('')
 }
+
+/** Join path pieces with `/`, collapsing repeats. All the file paths here need, without `node:path`. */
+export function joinPath(...parts: string[]): string {
+  return parts.join('/').replace(/\/{2,}/g, '/')
+}

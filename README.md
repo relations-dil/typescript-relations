@@ -780,8 +780,25 @@ Instance: `filter()`, `sort()`, `limit()`, `set()`, `add()`, `queue()`, `export(
 
 ### Sources
 
-`Source` (subclass this), `MockSource` (in-memory, complete), `register()`, `source()`,
-`unregister()`, `clear()`, `SOURCES`.
+`Source` (subclass this), `MockSource` (in-memory, complete), `LocalSource` (the same, kept in the
+browser's `localStorage`), `register()`, `source()`, `unregister()`, `clear()`, `SOURCES`.
+
+#### LocalSource
+
+For pages that need to remember things with no server: it behaves like any other source, but the
+data survives a reload.
+
+```ts
+import { LocalSource } from '@relations-dil/relations/local'
+
+new LocalSource('example', { key: 'my-app' })
+```
+
+It loads once when it's made and saves after every write that succeeds, as plain JSON under `key`
+(default `relations:<name>`). Pass `storage` to use something other than `localStorage`. Two tabs
+open on the same key don't see each other's changes; whichever saves last wins, and `reset()`
+forgets everything. If what's in storage isn't valid JSON it refuses to start, rather than
+overwrite it.
 
 ### Migrations and data
 

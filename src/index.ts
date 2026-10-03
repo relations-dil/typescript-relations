@@ -100,6 +100,8 @@ export { Migrations, pretty, type Renamer } from './migrations.js'
 
 export { MockQuery, MockSource } from './mock.js'
 
+export { LocalSource, type StorageLike } from './local.js'
+
 export {
   fields,
   type Listed,

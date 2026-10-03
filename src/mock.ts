@@ -11,14 +11,11 @@
  * ```
  */
 
-import { readdir, readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-
 import * as overscore from './overscore.js'
 import { ModelError, UniqueError } from './errors.js'
 import { Source, type Query } from './source.js'
 import { Titles } from './titles.js'
-import { clone, stable } from './util.js'
+import { clone, joinPath, stable } from './util.js'
 import { construct, type Model, type ModelIdentity } from './model.js'
 import type { Field } from './field.js'
 
@@ -492,6 +489,7 @@ export class MockSource extends Source {
   // ------------------------------------------------------------------ files
 
   async definition(filePath: string, sourcePath: string): Promise<void> {
+    const { readFile } = await import('node:fs/promises')
     const definitions: Stored[] = []
     const definition = JSON.parse(await readFile(filePath, 'utf8'))
 
@@ -507,6 +505,7 @@ export class MockSource extends Source {
   }
 
   async migration(filePath: string, sourcePath: string): Promise<void> {
+    const { readFile } = await import('node:fs/promises')
     const migrations: Stored[] = []
     const migration = JSON.parse(await readFile(filePath, 'utf8'))
 
@@ -581,10 +580,13 @@ export class MockSource extends Source {
   }
 
   async load(loadPath: string): Promise<void> {
+    const { readFile } = await import('node:fs/promises')
+
     await this.execute(JSON.parse(await readFile(loadPath, 'utf8')))
   }
 
   async list(sourcePath: string): Promise<globalThis.Record<string, any>> {
+    const { readdir } = await import('node:fs/promises')
     const migrations: globalThis.Record<string, any> = {}
 
     for (const fileName of await readdir(sourcePath)) {
@@ -605,6 +607,7 @@ export class MockSource extends Source {
   }
 
   async migrate(sourcePath: string): Promise<boolean> {
+    const { readdir } = await import('node:fs/promises')
     let migrated = false
 
     const paths = (await readdir(sourcePath))
@@ -614,12 +617,12 @@ export class MockSource extends Source {
     if (this.migrations === null) {
       this.migrations = []
 
-      await this.load(join(sourcePath, 'definition.json'))
+      await this.load(joinPath(sourcePath, 'definition.json'))
       migrated = true
     } else {
       for (const path of paths) {
         if (!this.migrations.includes(stampOf(path))) {
-          await this.load(join(sourcePath, path))
+          await this.load(joinPath(sourcePath, path))
           migrated = true
         }
       }
@@ -644,5 +647,5 @@ async function write(sourcePath: string, filePath: string, contents: unknown): P
   const { writeFile } = await import('node:fs/promises')
   const fileName = (filePath.split('/').pop() as string).split('.')[0]
 
-  await writeFile(join(sourcePath, `${fileName}.json`), `${JSON.stringify(contents)}\n`)
+  await writeFile(joinPath(sourcePath, `${fileName}.json`), `${JSON.stringify(contents)}\n`)
 }

@@ -4,3 +4,4 @@ dist/
 dist-test/
 example/dotroute/www/js/relations-dil.js
 example/dotroute/www/vendor/
+example/single/app.html

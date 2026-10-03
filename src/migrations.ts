@@ -6,12 +6,10 @@
  * every backend a set of models is used with.
  */
 
-import { mkdir, readdir, readFile, rename as renameFile, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 
 import { MigrationsError } from './errors.js'
 import { source as registered } from './registry.js'
-import { equal } from './util.js'
+import { equal, joinPath } from './util.js'
 import { MigrationsRef, type ModelClass } from './model.js'
 
 /**
@@ -43,8 +41,10 @@ export class Migrations {
 
   /** The definition as of the last generate, or an empty one. */
   async current(): Promise<globalThis.Record<string, any>> {
+    const { readFile } = await import('node:fs/promises')
+
     try {
-      return JSON.parse(await readFile(join(this.directory, 'definition.json'), 'utf8'))
+      return JSON.parse(await readFile(joinPath(this.directory, 'definition.json'), 'utf8'))
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         return {}
@@ -290,6 +290,8 @@ export class Migrations {
    * Resolves to whether anything was written.
    */
   async generate(models: ModelClass[], stamp?: string): Promise<boolean> {
+    const { mkdir, rename: renameFile, writeFile } = await import('node:fs/promises')
+
     await mkdir(this.directory, { recursive: true })
 
     const current = await this.current()
@@ -304,14 +306,14 @@ export class Migrations {
       const at = stamp ?? stamped()
 
       await renameFile(
-        join(this.directory, 'definition.json'),
-        join(this.directory, `definition-${at}.json`)
+        joinPath(this.directory, 'definition.json'),
+        joinPath(this.directory, `definition-${at}.json`)
       )
 
-      await writeFile(join(this.directory, `migration-${at}.json`), pretty(migration))
+      await writeFile(joinPath(this.directory, `migration-${at}.json`), pretty(migration))
     }
 
-    await writeFile(join(this.directory, 'definition.json'), pretty(define))
+    await writeFile(joinPath(this.directory, 'definition.json'), pretty(define))
 
     return true
   }
@@ -324,7 +326,7 @@ export class Migrations {
       throw new MigrationsError(`no source registered as '${name}'`)
     }
 
-    return join(this.directory, source.name, String(source.KIND))
+    return joinPath(this.directory, source.name, String(source.KIND))
   }
 
   /** Convert every definition and migration into a source's own form. */
@@ -335,6 +337,7 @@ export class Migrations {
       throw new MigrationsError(`no source registered as '${name}'`)
     }
 
+    const { mkdir, readdir } = await import('node:fs/promises')
     const path = this.sourcePath(name)
 
     await mkdir(path, { recursive: true })
@@ -345,9 +348,9 @@ export class Migrations {
       }
 
       if (file.startsWith('definition')) {
-        await source.definition(join(this.directory, file), path)
+        await source.definition(joinPath(this.directory, file), path)
       } else if (file.startsWith('migration')) {
-        await source.migration(join(this.directory, file), path)
+        await source.migration(joinPath(this.directory, file), path)
       }
     }
   }
@@ -371,7 +374,7 @@ export class Migrations {
       throw new MigrationsError(`no source registered as '${name}'`)
     }
 
-    return source.load(join(this.sourcePath(name), fileName))
+    return source.load(joinPath(this.sourcePath(name), fileName))
   }
 
   /** Bring a source up to date. Resolves to whether anything was applied. */

@@ -1,7 +1,13 @@
 // wait = true: don't route until service.js has fetched the models.
 window.DRApp = new DoTRoute.Application(null, null, true);
 
+// Templates are plain files, loaded once at startup - or, in a single-file page, embedded in it
+// as <script type="text/x-dot" id="template-NAME">.
 DRApp.load = function (name) {
+    var embedded = document.getElementById("template-" + name);
+    if (embedded) {
+        return embedded.text;
+    }
     return $.ajax({url: name + ".html", async: false}).responseText;
 }
 

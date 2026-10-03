@@ -5,6 +5,20 @@ All notable changes to this project are recorded here, newest first. Format foll
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-02
+
+### Added
+- A `VERSION` file as the one place the version is set. The Makefile reads it, and `make version`, `make pack` and `make publish` sync `package.json` and the lockfile to it, so what's published always matches.
+- `LocalSource` (`@relations-dil/relations/local`, also exported from the index): a source that keeps its data in `localStorage` (or any `storage` you pass), loading when it's made and saving after every successful write. `MockSource` stays purely in memory.
+- `make local`: builds the single file and opens it in your browser (`open`, or `xdg-open` where there's no `open`).
+- `example/single/` and `make single`: builds the doTRoute app into one self-contained `app.html` (library, UIkit, jQuery, doT, doTRoute, templates and app all inlined) that opens from disk with no server and keeps its data in `localStorage`. The example app picks `LocalSource` when the page sets `STORAGE_KEY`, and only seeds an empty store; `DRApp.load` reads templates embedded in the page when there are any.
+- `make shell` mounts `~/.npmrc` too, so npm commands run as you, but only when the file exists.
+
+### Changed
+- File access in `MockSource` and `Migrations` is loaded lazily and `node:path` is no longer used (a small `joinPath` replaces it), so the library bundles for the browser with no stub and no Node polyfills; only the file-based features need Node when called. `make dotroute` no longer needs a stub file, and `esbuild` is now a dev dependency.
+
+## [0.1.0] - 2026-10-02
+
 ### Added
 - Package metadata for npm: `repository`, `homepage` and `bugs`.
 - Initial TypeScript port (usable from plain JavaScript) of python-relations (npm package `@relations-dil/relations`): Model, Field, Record, Relation, Source, Migrations, Titles, MockSource, overscore, and models-from-data.
