@@ -1,0 +1,6 @@
+node_modules/
+dist/
+*.tgz
+dist-test/
+example/dotroute/www/js/relations-dil.js
+example/dotroute/www/vendor/

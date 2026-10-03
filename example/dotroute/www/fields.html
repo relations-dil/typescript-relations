@@ -1,0 +1,154 @@
+{{~it.fields :field}}
+    {{
+        var prefix = it.prefix || [];
+        var full_name = prefix.concat(field.name).join('-').replace(/\./g, '-');
+        var value = field.value;
+        if (value == null) {
+            value = field.original
+        }
+        if (value == null) {
+            value = field.default
+        }
+        if (value== null && field.multi) {
+            value = [];
+        }
+        var readonly = field.readonly || it.readonly;
+        if (field.kind == "list" || field.kind == "dict" || (field.init && readonly)) {
+            value = JSON.stringify(value, null, 2);
+        }
+        var style = field.kind == "list" || field.kind == "dict" || (field.init && readonly) ? "textarea" : field.style;
+        var pre = field.name == "yaml" || field.kind == "list" || field.kind == "dict" || field.init;
+    }}
+    {{?field.fields || field.name == "yaml"}}
+    <div class="uk-margin"><hr/></div>
+    {{?}}
+    <div class="uk-margin">
+        <label class="uk-form-label" for="{{=field.name}}"><strong>{{=field.title || field.name}}</strong></label>
+        <div class="uk-form-controls">
+    {{?style == "textarea"}}
+        {{?readonly}}
+            {{?pre}}<pre>{{?}}{{=value || ''}}{{?pre}}</pre>{{?}}
+        {{??}}
+            <textarea
+                class="uk-textarea" rows="7"
+                id="{{!full_name}}"
+                placeholder="{{!field.title || field.name}}"
+                {{?field.trigger}}OnInput="DRApp.current.controller.fields_change();"{{?}}
+            >{{=value}}</textarea>
+        {{?}}
+    {{??field.options}}
+        {{?readonly}}
+            {{?field.multi || field.kind == "set"}}
+                {{~value :option}}
+                    {{= field.titles ? field.titles[option] : option}}<br/>
+                {{~}}
+            {{??}}
+                {{= field.titles ? field.titles[value] : value}}<br/>
+            {{?}}
+        {{??style == "select" || field.options.length > 10 || field.overflow || field.like || field.titles}}
+            <select class="uk-select" id="{{!full_name}}" {{?field.trigger}}OnChange="DRApp.current.controller.fields_change();"{{?}}>
+            {{?field.optional}}
+                <option value=''></option>
+            {{?}}
+            {{~field.options :option}}
+                <option value='{{!option}}' {{?value == option}}selected{{?}}>
+                    {{=DRApp.format(option, field.format, field.titles)}}
+                </option>
+            {{~}}
+            </select>
+            {{?field.options.length > 25 || field.overflow || field.like}}
+            <input
+                class="uk-input uk-form-width-medium"
+                id="{{!full_name}}__like" value="{{!field.like || ''}}"
+                type="text"
+            />
+            <button type="button" OnClick="DRApp.current.controller.fields_change()" class="uk-button uk-button-primary">
+                Search
+            </button>
+                {{? field.overflow}}
+                <i>Too many results returned. Narrow with Search. </i>
+                {{?}}
+            {{?}}
+        {{??}}
+            {{~field.options :option}}
+            <label>
+            <input
+                value="{{!option}}"
+            {{?field.multi || field.kind == "set"}}
+                class="uk-checkbox" type="checkbox" name="{{!full_name}}"
+                {{?value.indexOf(option) > -1}}checked{{?}}
+            {{??}}
+                class="uk-radio" type="radio" name="{{!full_name}}"
+                {{?value == option}}checked{{?}}
+            {{?}}
+                {{?field.trigger}}OnClick="DRApp.current.controller.fields_change();"{{?}}
+            />
+                {{=DRApp.format(option, field.format, field.titles)}}
+            </label><br/>
+            {{~}}
+        {{?}}
+    {{??!field.fields}}
+        {{?field.init}}
+            {{~Object.values(field.init) :attr}}
+            <strong>{{= attr }}</strong>
+            <input
+                class="uk-input"
+                id="{{!full_name}}__{{!attr}}"
+                placeholder="{{!attr}}"
+                value="{{!value ? DRApp.format(value[attr]) : ''}}"
+                {{?field.trigger}}OnInput="DRApp.current.controller.fields_change();"{{?}}
+                type="text"
+            />
+            <br/>
+            {{~}}
+        {{??field.kind == "bool"}}
+            {{?readonly}}
+            {{= value ? 'true' : 'false' }}
+            {{??}}
+            <input
+                class="uk-checkbox"
+                id="{{!full_name}}"
+                value="1"
+                type="checkbox"
+                {{?value}}checked{{?}}
+                {{?field.trigger}}OnClick="DRApp.current.controller.fields_change();"{{?}}
+            />
+            {{?}}
+        {{??}}
+            {{?readonly}}
+            {{=DRApp.format(value, field.format, field.titles)}}
+            {{??}}
+            <input
+                class="uk-input"
+                id="{{!full_name}}"
+                placeholder="{{!field.title || field.name}}"
+                value="{{!DRApp.format(value)}}"
+                {{?field.trigger}}OnInput="DRApp.current.controller.fields_change();"{{?}}
+                type="text"
+            />
+            {{?}}
+        {{?}}
+            <br/>
+    {{?}}
+    {{?field.errors}}
+            <span class='uk-text-danger'>
+        {{~field.errors :error}}
+                {{=error}}
+        {{~}}
+            </span>
+    {{?}}
+    {{?field.description}}
+            <div class="uk-text-meta">{{=field.description.replace(/\n/g, "<br/>")}}</div>
+    {{?}}
+    {{?field.link}}
+        {{ var links = Array.isArray(field.link) ? field.link : [field.link]; }}
+        {{~links: link}}
+            <a href="{{!link.url || link}}" target="{{!link.target || '_blank'}}">{{=link.name || link.url || link}}</a><br/>
+        {{~}}
+    {{?}}
+        </div>
+    </div>
+    {{?field.fields}}
+        {{= DRApp.templates.Fields({fields: field.fields, readonly: readonly, prefix: prefix.concat(field.name)}) }}
+    {{?}}
+{{~}}

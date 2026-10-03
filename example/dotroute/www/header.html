@@ -1,0 +1,25 @@
+<h3 class="uk-text-center uk-margin-top">relations-dil</h3>
+
+<nav class="uk-navbar-container">
+    <div class="uk-container">
+        <div uk-navbar>
+            <div class="uk-navbar-left">
+                <ul class="uk-navbar-nav">
+                    <li {{? DRApp.current.paths[0] == '' }}class="uk-active"{{?}}>
+                        <a href="{{=DRApp.link('home')}}">Home</a>
+                    </li>
+{{~ DRApp.models :model}}
+                    <li {{? DRApp.current.paths[0] == model.singular }}class="uk-active"{{?}}>
+                        <a href="{{=DRApp.link(model.singular + '_list')}}">{{= model.title }}</a>
+                    </li>
+{{~}}
+                </ul>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div class="uk-container uk-margin-top uk-margin-large-bottom">
+{{? it.error }}
+    <div class="uk-alert-danger" uk-alert><p>{{!it.error}}</p></div>
+{{?}}

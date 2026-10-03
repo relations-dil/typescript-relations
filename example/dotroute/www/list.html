@@ -1,0 +1,45 @@
+{{#def.Header}}
+<div class="uk-overflow-auto">
+    <form class="uk-grid-small" uk-grid onsubmit="return false;">
+        <div>
+            <button type="button" OnClick="DRApp.go('{{! DRApp.current.controller.model.singular }}_create')" class="uk-button uk-button-primary">
+                Create
+            </button>
+        </div>
+        <div>
+            <button type="button" OnClick="DRApp.current.controller.search()" class="uk-button uk-button-primary">
+                Search
+            </button>
+        </div>
+        <div>
+            <input class="uk-input uk-form-width-medium" id="like" value="{{!it.like}}" onKeyPress="DRApp.current.controller.like(event)" type="text"/>
+        </div>
+    </form>
+    <table class="uk-table uk-table-hover uk-table-divider">
+        <thead>
+            <tr>
+{{~DRApp.current.controller.model.list :field}}
+                <th>{{= field }}</th>
+{{~}}
+            </tr>
+        </thead>
+        <tbody>
+{{~it[DRApp.current.controller.model.plural] :model}}
+            <tr
+    {{? DRApp.current.controller.model.id }}
+            OnClick="DRApp.go('{{! DRApp.current.controller.model.singular }}_retrieve','{{=model[DRApp.current.controller.model.id]}}')" class="clickable"
+    {{?}}
+            >
+    {{~DRApp.current.controller.model.list :field}}
+        {{?it.formats[field]}}
+                <td>{{=DRApp.format(model[field], it.formats[field].format, it.formats[field].titles)}}</td>
+        {{??}}
+                <td>{{=DRApp.get(model, field)}}</td>
+        {{?}}
+    {{~}}
+            </tr>
+{{~}}
+        </tbody>
+    </table>
+</div>
+{{#def.Footer}}

@@ -1,0 +1,27 @@
+# An app described entirely as data. Load it with modelsFrom().
+models:
+  unit:
+    source: example
+    name: unit
+    title: Unit
+    id: id
+    unique: {name: [name]}
+    index: {}
+    fields:
+      - {kind: int, name: id,   store: id,   auto: true}
+      - {kind: str, name: name, store: name, none: false}
+
+  test:
+    source: example
+    name: test
+    title: Test
+    id: id
+    unique: {unit_id-name: [unit_id, name]}
+    index: {}
+    fields:
+      - {kind: int, name: id,      store: id, auto: true}
+      - {kind: int, name: unit_id, store: unit_id}
+      - {kind: str, name: name,    store: name, none: false}
+
+relations:
+  - {kind: OneToMany, parent: unit, child: test}
