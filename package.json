@@ -1,6 +1,6 @@
 {
   "name": "@relations-dil/relations",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "A simple, flexible DIL (data interface layer). Define models once, independent of backend; set the source at runtime.",
   "license": "MIT",
   "repository": {

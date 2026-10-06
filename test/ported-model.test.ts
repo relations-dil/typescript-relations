@@ -156,6 +156,16 @@ class Test extends fields({ id: int, unit_id: int, name: str }, ModelTest) {
 
 new OneToMany(Unit, Test)
 
+class Owner extends fields({ id: int, name: str }, ModelTest) {
+  declare pet: any
+}
+
+class Pet extends fields({ id: int, name: str, what: dict }, ModelTest) {
+  declare owner: any
+}
+
+new OneToMany(Owner, Pet, { childInject: 'what' })
+
 class Case extends fields({ id: int, test_id: int, name: str }, ModelTest) {
   declare test: any
 }
@@ -1136,15 +1146,14 @@ describe('Model', () => {
 
     // parents
 
-    assert.deepEqual(test.unit._related, { id: null })
-    assert.equal(test.unit._role, 'parent')
-    assert.equal(test.unit._mode, 'one')
-    assert.equal(test.unit._action, 'retrieve')
-    assert.equal(test.unit._record._action, 'retrieve')
-    assert.equal(test.unit._record.field('id').criteria.null, true)
+    // no key means no parent
+
+    assert.equal(test.unit, null)
 
     test.unit_id = 1
     assert.deepEqual(test.unit._related, { id: 1 })
+    assert.equal(test.unit._role, 'parent')
+    assert.equal(test.unit._mode, 'one')
 
     const ya: any = await test.unit.retrieve()
     assert.equal(ya.name, 'ya')
@@ -1292,6 +1301,42 @@ describe('Model', () => {
 
     assert.deepEqual(mary.bro.id, [dick.id, tom.id])
     assert.deepEqual(harry.sis.id, [dot.id, nikki.id])
+  
+
+    // an injected key works the same, no key no parent
+
+    const son: any = new Pet({ name: 'loner' } as any)
+
+    assert.equal(son.owner, null)
+
+    son.owner_id = 7
+
+    assert.deepEqual(son.owner._related, { id: 7 })
+    assert.equal(son.owner._role, 'parent')
+
+    // an injected key stores, retrieves and relates like a column
+
+    const mom: any = await new Owner('mommy').create()
+    await new Owner('nobody').create()
+
+    await new Pet({ name: 'kid', owner_id: mom.id } as any).create()
+    await new Pet({ name: 'stray' } as any).create()
+
+    const kid: any = await Pet.one({ name: 'kid' }).retrieve()
+    const stray: any = await Pet.one({ name: 'stray' }).retrieve()
+
+    assert.deepEqual(kid.what, { relations: { owner: { id: mom.id } } })
+    assert.deepEqual(stray.what, {})
+
+    assert.deepEqual(((await Pet.many({ owner_id: mom.id }).retrieve()) as any).name, ['kid'])
+    assert.deepEqual(((await Pet.many({ owner_id__in: [mom.id] }).retrieve()) as any).name, ['kid'])
+    assert.deepEqual(((await Pet.many({ owner_id__null: true }).retrieve()) as any).name, ['stray'])
+
+    assert.equal(((await kid.owner.retrieve()) as any).name, 'mommy')
+    assert.equal(stray.owner, null)
+
+    assert.deepEqual(((await Pet.many({ owner__name: 'mommy' }).retrieve()) as any).name, ['kid'])
+    assert.deepEqual(((await Owner.many({ pet__name: 'kid' }).retrieve()) as any).name, ['mommy'])
   })
 
   it('test__collate', async () => {
@@ -1664,6 +1709,19 @@ describe('Model', () => {
 
     const unit: any = Unit.one(0)
     await rejectsModel(() => unit.create(), /unit: cannot create during retrieve/)
+  
+
+    // an injected key is stored in the dict field, with or without a parent
+
+    const pat: any = await new Owner('pat').create()
+
+    await new Pet({ name: 'rex', owner_id: pat.id } as any).create()
+    await new Pet({ name: 'stray' } as any).create()
+
+    assert.equal(((await Pet.one({ name: 'rex' }).retrieve()) as any).owner_id, pat.id)
+    assert.deepEqual(((await Pet.one({ name: 'rex' }).retrieve()) as any).what, { relations: { owner: { id: pat.id } } })
+    assert.equal(((await Pet.one({ name: 'stray' }).retrieve()) as any).owner_id, null)
+    assert.deepEqual(((await Pet.one({ name: 'stray' }).retrieve()) as any).what, {})
   })
 
   it('test_count', async () => {
@@ -1674,6 +1732,18 @@ describe('Model', () => {
 
     const unit: any = new Unit('sure')
     await rejectsModel(() => unit.count(), /unit: cannot count during create/)
+  
+
+    // an injected key counts like any other
+
+    const pat: any = await new Owner('pat').create()
+
+    await new Pet({ name: 'rex', owner_id: pat.id } as any).create()
+    await new Pet({ name: 'stray' } as any).create()
+
+    assert.equal(await Pet.many().count(), 2)
+    assert.equal(await Pet.many({ owner_id: pat.id }).count(), 1)
+    assert.equal(await Pet.many({ owner_id: 99 }).count(), 0)
   })
 
   it('test_retrieve', async () => {
@@ -1684,6 +1754,16 @@ describe('Model', () => {
 
     const unit: any = new Unit('sure')
     await rejectsModel(() => unit.retrieve(), /unit: cannot retrieve during create/)
+  
+
+    // an injected key retrieves by its value
+
+    const pat: any = await new Owner('pat').create()
+
+    await new Pet({ name: 'rex', owner_id: pat.id } as any).create()
+
+    assert.equal(((await Pet.one({ owner_id: pat.id }).retrieve()) as any).name, 'rex')
+    assert.equal(await Pet.one({ owner_id: 99 }).retrieve(false), null)
   })
 
   it('test_titles', async () => {
@@ -1706,6 +1786,31 @@ describe('Model', () => {
 
     const creating: any = new Unit('sure')
     await rejectsModel(() => creating.update(), /unit: cannot update during create/)
+  
+
+    // an injected key updates like a column, but not in mass
+
+    const pat: any = await new Owner('pat').create()
+    const sam: any = await new Owner('sam').create()
+
+    const rex: any = await new Pet({ name: 'rex', owner_id: pat.id } as any).create()
+
+    rex.owner_id = sam.id
+
+    assert.equal(await rex.update(), 1)
+    assert.equal(((await Pet.one({ name: 'rex' }).retrieve()) as any).owner_id, sam.id)
+    assert.equal(await Pet.many({ owner_id: pat.id }).count(), 0)
+
+    rex.owner_id = null
+
+    assert.equal(await rex.update(), 1)
+    assert.equal(((await Pet.one({ name: 'rex' }).retrieve()) as any).owner_id, null)
+    assert.equal(await Pet.many({ owner_id__null: true }).count(), 1)
+
+    await assert.rejects(
+      async () => (Pet.many({ name: 'rex' }) as any).set({ owner_id: sam.id }).update(),
+      (error: any) => error instanceof FieldError && /no mass update with inject/.test(error.message)
+    )
   })
 
   it('test_delete', async () => {
@@ -1719,6 +1824,17 @@ describe('Model', () => {
 
     const creating: any = new Unit('sure')
     await rejectsModel(() => creating.delete(), /unit: cannot delete during create/)
+  
+
+    // an injected key deletes like any other
+
+    const pat: any = await new Owner('pat').create()
+
+    await new Pet({ name: 'rex', owner_id: pat.id } as any).create()
+    await new Pet({ name: 'stray' } as any).create()
+
+    assert.equal(await Pet.many({ owner_id: pat.id }).delete(), 1)
+    assert.equal(await Pet.many().count(), 1)
   })
 
   it('test_query', async () => {

@@ -13,7 +13,10 @@
  */
 
 import { ModelError } from './errors.js'
+import { Field } from './field.js'
+import { dict } from './kinds.js'
 import type { ModelClass, ModelIdentity } from './model.js'
+import { DNS } from './registry.js'
 
 /** Base for every relation, holding the convention used to find the joining field. */
 export class Relation {
@@ -59,6 +62,11 @@ export interface OneToOptions {
   parentId?: string | number
   /** Field on the child that points at the parent. Inferred by convention. */
   childParentRef?: string | number
+  /**
+   * A dict field on the child to store the parent id in, so the child needs no field of its own
+   * for it. The relation adds that field, at `<childInject>__relations__<parent>__<id>`.
+   */
+  childInject?: string
 }
 
 /** One parent record to one or many child records. */
@@ -79,6 +87,8 @@ export class OneTo extends Relation {
   childParentRef: string
   /** Attribute on the child that reaches the parent. */
   childParentAttr: string
+  /** The dict field in the child the parent id is stored in, if it's not a field of its own. */
+  childInject: string | null
 
   /** Whether the child side holds one record or many. */
   MODE: 'one' | 'many'
@@ -91,17 +101,62 @@ export class OneTo extends Relation {
     this.Parent = Parent
     this.Child = Child
     this.MODE = kind.MODE
+    this.childInject = options.childInject ?? null
 
     const parent = Parent.thy()
-    const child = Child.thy()
+    let child = Child.thy()
 
     this.parentId = parent._fieldName(options.parentId ?? (parent._id as string))
     this.parentChildAttr = options.parentChildAttr ?? (child.NAME as string)
 
+    let childParentRef = options.childParentRef
+
+    // If asked, add the child field for the parent id, stored in a dict field of the child.
+    if (this.childInject !== null) {
+      const stored = child._fields._names.get(this.childInject)
+
+      if (stored === undefined) {
+        throw new ModelError(child, `cannot find field ${this.childInject} in ${child.NAME}`)
+      }
+
+      if (stored.kind !== dict) {
+        throw new ModelError(child, `field ${this.childInject} not a dict in ${child.NAME}`)
+      }
+
+      // Same source is just the model name, else prefix the source of the parent (a dns label).
+      let named = parent.NAME as string
+
+      if (parent.SOURCE !== child.SOURCE) {
+        if (typeof parent.SOURCE !== 'string' || !DNS.test(parent.SOURCE)) {
+          throw new ModelError(parent, `source ${parent.SOURCE} is not dns compliant`)
+        }
+        named = `${parent.SOURCE.toLowerCase().replace(/-/g, '_')}_${parent.NAME}`
+      }
+
+      const ref = childParentRef !== undefined ? String(childParentRef) : `${named}_${this.parentId}`
+
+      if (child._fields.has(ref)) {
+        throw new ModelError(child, `field ${ref} already exists in ${child.NAME}`)
+      }
+
+      const kindOfParent = (parent._fields._names.get(this.parentId) as Field).kind
+
+      Child.fields = {
+        ...Child.fields,
+        [ref]: new Field(kindOfParent, {
+          inject: `${this.childInject}__relations__${named}__${this.parentId}`,
+          none: true
+        })
+      }
+
+      childParentRef = ref
+      child = Child.thy()
+    }
+
     this.childParentAttr = options.childParentAttr ?? (parent.NAME as string)
     this.childParentRef =
-      options.childParentRef !== undefined
-        ? child._fieldName(options.childParentRef)
+      childParentRef !== undefined
+        ? child._fieldName(childParentRef)
         : Relation.relativeField(parent, child, kind.SAME)
 
     this.Parent._child(this)

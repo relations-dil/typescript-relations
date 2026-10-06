@@ -335,6 +335,17 @@ static fields = {
 }
 ```
 
+A relation can do the injecting for you, so a shared model can take on an optional parent
+without being edited or getting a column of its own. Name the dict field to store it in:
+
+```ts
+new OneToMany(Unum, Entity, { childInject: 'what' })
+// adds entity.unum_id, stored at what.relations.unum.id; entity.unum is null when there isn't one
+```
+
+The key is named `<model>_<id>`, or `<parent source>_<model>_<id>` when the parent lives in a
+different source, which has to be a dns label (letters, digits and hyphens).
+
 ---
 
 ## Querying

@@ -617,7 +617,28 @@ export class Field {
     const value = this.export()
 
     if (this.inject) {
-      overscore.set(values, this.inject.split('__').slice(1).join('__'), value)
+      const path = this.inject.split('__').slice(1).join('__')
+
+      if (value === null || value === undefined) {
+        // A null isn't stored when it's only dict keys: a missing key reads back as null,
+        // and storage has no nulls to trip over.
+        const keys = overscore.parse(path)
+        let container: any = values
+
+        for (const key of keys.slice(0, -1)) {
+          container =
+            overscore.isDict(container) && typeof key === 'string' ? (key in container ? container[key] : {}) : null
+        }
+
+        const last = keys[keys.length - 1]
+
+        if (overscore.isDict(container) && typeof last === 'string') {
+          delete container[last]
+          return
+        }
+      }
+
+      overscore.set(values, path, value)
     } else if (this.store) {
       values[this.store] = value
     }

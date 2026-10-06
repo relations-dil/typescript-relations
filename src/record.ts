@@ -200,7 +200,14 @@ export class Record {
   /** Whether a stored record satisfies every field's criteria. */
   retrieve(values: globalThis.Record<string, any>): boolean {
     for (const field of this._order) {
-      if (!field.retrieve(values)) {
+      if (field.inject) {
+        // An injected field is checked where it's stored, in the field it lives inside.
+        const injected = overscore.get(values[this.injected(field)] ?? {}, field.inject.split('__').slice(1).join('__'))
+
+        if (!field.retrieve({ [field.store as string]: injected })) {
+          return false
+        }
+      } else if (!field.retrieve(values)) {
         return false
       }
     }
