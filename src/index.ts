@@ -34,7 +34,7 @@ import * as overscore from './overscore.js'
 
 export { overscore }
 
-export { FieldError, MigrationsError, ModelError, RecordError, UniqueError } from './errors.js'
+export { FieldError, MigrationsError, ModelError, RecordError, SourceError, UniqueError } from './errors.js'
 export { OverscoreError } from './overscore.js'
 
 export {
@@ -123,7 +123,7 @@ export {
   type RelationDefinition
 } from './dynamic.js'
 
-export { SOURCES, clear, register, source, unregister, type Registered } from './registry.js'
+export { DNS, SOURCES, clear, register, source, unregister, type Registered } from './registry.js'
 
 import type { ModelClass } from './model.js'
 import { Model as ModelBase } from './model.js'

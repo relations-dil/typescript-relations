@@ -640,6 +640,32 @@ describe('Field (ported)', () => {
       assert.deepEqual(values, { a: { b: [{ '1': 'yep' }] } })
     })
 
+    it('does not store an injected null, a missing key reads back as null', () => {
+      const field = new Field(int, { inject: 'things__relations__owner__id' })
+      field.value = null
+
+      let values: Record<string, any> = {}
+      field.write(values)
+      assert.deepEqual(values, {})
+
+      values = { relations: { owner: { id: 5, other: 1 } } }
+      field.write(values)
+      assert.deepEqual(values, { relations: { owner: { other: 1 } } })
+
+      values = { relations: { owner: { id: 5 } } }
+      field.write(values)
+      assert.deepEqual(values, { relations: { owner: {} } })
+    })
+
+    it('still sets an injected null through a list', () => {
+      const field = new Field(str, { inject: 'things__a__b__0____1' })
+      field.value = null
+
+      const values: Record<string, any> = { a: { b: [{ '1': 'yep' }] } }
+      field.write(values)
+      assert.deepEqual(values, { a: { b: [{ '1': null }] } })
+    })
+
     it('writes nothing without a store', () => {
       const field = new Field(str, { store: false })
       field.value = 'yep'

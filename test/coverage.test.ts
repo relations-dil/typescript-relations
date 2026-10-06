@@ -12,6 +12,7 @@ import { join } from 'node:path'
 
 import * as library from '../src/index.js'
 import {
+  DNS,
   Field,
   Migrations,
   MigrationsError,
@@ -20,7 +21,9 @@ import {
   Model,
   OneToOne,
   OneToMany,
+  SOURCES,
   Source,
+  SourceError,
   bool,
   clear,
   definitionsOf,
@@ -210,6 +213,29 @@ describe('registry', () => {
 
     register({ name: 'back' })
     assert.ok(source('back'))
+  })
+
+  it('matches dns labels', () => {
+    for (const name of ['a', 'A', '0', 'a-b', 'relations-restx', 'TestModel', 'a'.repeat(63)]) {
+      assert.equal(DNS.test(name), true, name)
+    }
+
+    for (const name of ['', '_', 'a_b', '-ab', 'ab-', 'a b', 'a.b', 'ab\n', 'a'.repeat(64)]) {
+      assert.equal(DNS.test(name), false, name)
+    }
+  })
+
+  it('only registers dns compliant names', () => {
+    register({ name: 'a' })
+
+    for (const name of [null, 1, '', 'a_b', '-ab', 'ab-', 'a b', 'a.b', 'a'.repeat(64)]) {
+      assert.throws(
+        () => register({ name } as any),
+        (error: any) => error instanceof SourceError && error.message === `source ${name} is not dns compliant`
+      )
+    }
+
+    assert.deepEqual([...SOURCES.keys()], ['a'])
   })
 })
 

@@ -701,12 +701,15 @@ export class Model extends ModelIdentity {
       const relation = this.PARENTS[name]
 
       if (!this._parents[name]) {
-        this._parents[name] =
-          this._action === 'retrieve'
-            ? (relation.Parent as any).many().limit(this._chunk)
-            : construct(relation.Parent as any, {
-                child: { [relation.parentId]: this._item(relation.childParentRef) }
-              })
+        if (this._action === 'retrieve') {
+          this._parents[name] = (relation.Parent as any).many().limit(this._chunk)
+        } else if (this._item(relation.childParentRef) === null) {
+          return null // No key means no parent, nothing to cache
+        } else {
+          this._parents[name] = construct(relation.Parent as any, {
+            child: { [relation.parentId]: this._item(relation.childParentRef) }
+          })
+        }
       }
 
       return this._parents[name]

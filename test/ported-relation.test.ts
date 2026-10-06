@@ -24,6 +24,7 @@ import { beforeEach, describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  Field,
   ManyToMany,
   MockSource,
   Model,
@@ -213,6 +214,141 @@ describe('OneTo (ported)', () => {
     assert.equal(relation.childParentAttr, 'mommy')
     assert.equal(relation.parentId, 'ident')
     assert.equal(relation.childParentRef, 'mom_ident')
+    assert.equal(relation.childInject, null)
+  })
+
+  it('injects the parent id into a dict field of the child', () => {
+    class Mom extends fields({ id: int, ident: int, name: str }, Model) {}
+    class Daughter extends fields({ id: int, name: str, what: dict }, Model) {}
+
+    let relation = new OneTo(Mom as any, Daughter as any, { childInject: 'what' })
+
+    assert.equal(relation.parentChildAttr, 'daughter')
+    assert.equal(relation.childParentAttr, 'mom')
+    assert.equal(relation.parentId, 'id')
+    assert.equal(relation.childParentRef, 'mom_id')
+    assert.equal(relation.childInject, 'what')
+
+    let names: any = (Daughter as any).thy()._fields._names
+
+    assert.equal(names.get('mom_id').kind, int)
+    assert.equal(names.get('mom_id').inject, 'what__relations__mom__id')
+    assert.equal(names.get('mom_id').none, true)
+    assert.equal(names.get('what').extract, null)
+
+    assert.ok('mom' in (Daughter as any).PARENTS)
+    assert.ok('daughter' in (Mom as any).CHILDREN)
+
+    assert.equal((new Daughter({ name: 'kid', mom_id: 7 } as any) as any).mom_id, 7)
+    assert.equal((new Daughter({ name: 'loner' } as any) as any).mom_id, null)
+
+    // Another parent goes into the same dict field
+
+    class Dad extends fields({ id: int, name: str }, Model) {}
+
+    new OneTo(Dad as any, Daughter as any, { childInject: 'what' })
+
+    names = (Daughter as any).thy()._fields._names
+
+    assert.equal(names.get('dad_id').inject, 'what__relations__dad__id')
+    assert.equal(names.get('what').extract, null)
+
+    // Overrides, and an existing extract is left alone
+
+    class Twin extends fields({ id: int, name: str, data: new Field(dict, { extract: 'other' }) }, Model) {}
+
+    relation = new OneTo(Mom as any, Twin as any, {
+      parentChildAttr: 'twins',
+      childParentAttr: 'mommy',
+      parentId: 'ident',
+      childParentRef: 'parent',
+      childInject: 'data'
+    })
+
+    assert.equal(relation.parentChildAttr, 'twins')
+    assert.equal(relation.childParentAttr, 'mommy')
+    assert.equal(relation.parentId, 'ident')
+    assert.equal(relation.childParentRef, 'parent')
+
+    names = (Twin as any).thy()._fields._names
+
+    assert.equal(names.get('parent').inject, 'data__relations__mom__ident')
+    assert.deepEqual(names.get('data').extract, { other: str })
+
+    // Same source is just model_id, different sources prefix the parent's source
+
+    class Ally extends fields({ id: int, name: str }, Model) {
+      static source = 'cumulus'
+    }
+
+    class Friend extends fields({ id: int, name: str }, Model) {
+      static source = 'Bucket-App'
+    }
+
+    class Entity extends fields({ id: int, name: str, what: dict }, Model) {
+      static source = 'cumulus'
+    }
+
+    relation = new OneTo(Ally as any, Entity as any, { childInject: 'what' })
+
+    assert.equal(relation.childParentRef, 'ally_id')
+    assert.equal((Entity as any).thy()._fields._names.get('ally_id').inject, 'what__relations__ally__id')
+
+    relation = new OneTo(Friend as any, Entity as any, { childInject: 'what' })
+
+    assert.equal(relation.childParentRef, 'bucket_app_friend_id')
+
+    names = (Entity as any).thy()._fields._names
+
+    assert.equal(names.get('bucket_app_friend_id').inject, 'what__relations__bucket_app_friend__id')
+    assert.equal(names.get('what').extract, null)
+
+    // Errors
+
+    class Cousin extends fields({ id: int, name: str, mom_id: int, what: dict }, Model) {}
+    class Orphan extends fields({ id: int, name: str }, Model) {}
+
+    assert.throws(
+      () => new OneTo(Mom as any, Cousin as any, { childInject: 'what' }),
+      (error: any) => error instanceof ModelError && /field mom_id already exists in cousin/.test(error.message)
+    )
+    assert.throws(
+      () => new OneTo(Mom as any, Orphan as any, { childInject: 'what' }),
+      (error: any) => error instanceof ModelError && /cannot find field what in orphan/.test(error.message)
+    )
+    assert.throws(
+      () => new OneTo(Mom as any, Orphan as any, { childInject: 'name' }),
+      (error: any) => error instanceof ModelError && /field name not a dict in orphan/.test(error.message)
+    )
+
+    // Sources have to be dns compliant when they're used in a name
+
+    for (const bad of [null, '', 'a_b', '-ab', 'ab-', 'a b', 'a.b', 'ab\n', 'a'.repeat(64)]) {
+      class Stranger extends fields({ id: int, name: str }, Model) {
+        static source = bad as any
+      }
+
+      class Local extends fields({ id: int, name: str, what: dict }, Model) {
+        static source = 'cumulus'
+      }
+
+      assert.throws(
+        () => new OneTo(Stranger as any, Local as any, { childInject: 'what' }),
+        (error: any) =>
+          error instanceof ModelError && error.message.includes(`stranger: source ${bad} is not dns compliant`)
+      )
+      assert.equal('stranger' in ((Local as any).PARENTS ?? {}), false)
+    }
+
+    class Fine extends fields({ id: int, name: str }, Model) {
+      static source = 'a'.repeat(63)
+    }
+
+    class Home extends fields({ id: int, name: str, what: dict }, Model) {
+      static source = 'cumulus'
+    }
+
+    assert.equal(new OneTo(Fine as any, Home as any, { childInject: 'what' }).childParentRef, `${'a'.repeat(63)}_fine_id`)
   })
 })
 

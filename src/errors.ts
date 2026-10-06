@@ -48,6 +48,14 @@ export class UniqueError extends ModelError {
   }
 }
 
+/** A source can't be registered, usually because its name isn't a dns label. */
+export class SourceError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'SourceError'
+  }
+}
+
 /** Something went wrong diffing or applying migrations. */
 export class MigrationsError extends Error {
   constructor(message: string) {

@@ -5,6 +5,20 @@ All notable changes to this project are recorded here, newest first. Format foll
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-06
+
+Parity with python-relations 0.6.16: an optional parent whose id is stored in a dict field of the child.
+
+### Added
+- `childInject` on `OneTo` (and so `OneToMany` and `OneToOne`): `new OneToMany(Unum, Entity, { childInject: 'what' })` adds a nullable key field to the child, `unum_id`, stored inside the child's `what` dict at `what__relations__unum__id`, so a model that's shared between apps can take on a parent without being edited or getting a column. The dict field has to be named, it isn't touched (no `extract`), and several parents can use the same one. It throws a `ModelError` if the key field already exists, the named field is missing, or it isn't a dict.
+- The key is named `<model>_<id>` when the parent and child share a source, else `<parent source>_<model>_<id>` (the source lowercased, `-` as `_`), like `bucket_app_pet_id`. `childParentRef` still overrides it.
+- `DNS` and `SourceError`: source names have to be dns labels (letters, digits and hyphens, 1 to 63 characters, no leading or trailing hyphen), so they're safe to use in field names. `register` throws a `SourceError` for any other name, and `OneTo` checks the parent's source when the two sources differ.
+
+### Changed
+- An empty key means no parent: `_relate` returns `null` for a parent when its key is `null`, instead of a placeholder parent that matches nothing. Setting the key later still loads the parent.
+- `Record.retrieve` checks an injected field where it's stored, in the field it lives inside, so filtering by an injected key works.
+- `Field.write` doesn't store a `null` for an injected field whose path is only dict keys, it leaves the key out (or removes it), since a missing key reads back as `null` and storage has no JSON nulls to trip over. Paths through a list still set the `null`.
+
 ## [0.2.1] - 2026-10-02
 
 ### Added

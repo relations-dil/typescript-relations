@@ -284,6 +284,21 @@ describe('Record', () => {
     assert.equal(record.retrieve({ _id: 1, _name: 'unit' }), true)
     assert.equal(record.retrieve({ _id: 2, _name: 'unit' }), false)
     assert.equal(record.retrieve({ _id: 1, _name: 'test' }), false)
+
+    // injected fields are checked where they're stored, in the other field
+
+    const things = new Field(dict, { name: 'things', store: '_things', default: () => ({}) })
+    const push = new Field(str, { name: 'push', inject: 'things__a__b__0____1' })
+
+    record.append(things)
+    record.append(push)
+
+    record.filter('push', 'yep')
+
+    assert.equal(record.retrieve({ _id: 1, _name: 'unit', _things: { a: { b: [{ '1': 'yep' }] } } }), true)
+    assert.equal(record.retrieve({ _id: 1, _name: 'unit', _things: { a: { b: [{ '1': 'nope' }] } } }), false)
+    assert.equal(record.retrieve({ _id: 1, _name: 'unit', _things: {} }), false)
+    assert.equal(record.retrieve({ _id: 1, _name: 'unit' }), false)
   })
 
   it('test_like', () => {
