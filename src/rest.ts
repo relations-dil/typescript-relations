@@ -14,7 +14,7 @@
  * `{"filter": ...}` body, which relations-restx treats exactly like a GET.
  */
 
-import { ModelError } from './errors.js'
+import { ModelError, MultipleError, NotFoundError } from './errors.js'
 import { Source } from './source.js'
 import { Titles } from './titles.js'
 import { sorted } from './util.js'
@@ -258,13 +258,13 @@ export class RestSource extends Source {
     const matches: Values[] = await this.result(model, model.PLURAL, await this.send('POST', model.ENDPOINT, body))
 
     if (model._mode === 'one' && matches.length > 1) {
-      throw new ModelError(model, 'more than one retrieved')
+      throw new MultipleError(model, 'more than one retrieved')
     }
 
     if (model._mode === 'one' && model._role !== 'child') {
       if (matches.length < 1) {
         if (verify) {
-          throw new ModelError(model, 'none retrieved')
+          throw new NotFoundError(model, 'none retrieved')
         }
 
         return null

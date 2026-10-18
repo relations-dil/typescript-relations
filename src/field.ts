@@ -781,6 +781,16 @@ export class Field {
 
   /** Write this field's value for an update, if it changed. */
   update(values: Record<string, any>): void {
+    // A readonly field isn't written, and an edit snaps back to what's stored.
+    if (this.readonly) {
+      if (this.original !== null && this.delta()) {
+        this.value = this.original
+        this.changed = false
+      }
+
+      return
+    }
+
     if (this.refresh && !this.delta()) {
       this.value = typeof this.default === 'function' ? this.default() : this.default
     }
@@ -793,6 +803,10 @@ export class Field {
 
   /** Write this field's value for a mass update, if it was set. */
   mass(values: Record<string, any>): void {
+    if (this.readonly) {
+      return
+    }
+
     if (this.refresh && !this.changed) {
       this.value = typeof this.default === 'function' ? this.default() : this.default
     }

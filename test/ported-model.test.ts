@@ -21,8 +21,12 @@ import {
   MockSource,
   Model,
   ModelError,
+  MultipleError,
+  NotFoundError,
   OneToMany,
   OneToOne,
+  RelationsError,
+  UniqueError,
   bool,
   clear,
   construct,
@@ -129,6 +133,15 @@ class Things extends fields({ name: { kind: str, storage: 'id' } }) {
   static id = null
   static unique = false as const
   static index = { no_name: ['name'] }
+}
+
+class Tag extends fields({ id: str, label: str }) {}
+
+class TagNamed extends fields({ slug: str, label: str }) {
+  static id = 'slug'
+  static titles = 'label'
+  static unique = 'label'
+  static order = '-label'
 }
 
 class ModelTest extends Model {
@@ -267,6 +280,49 @@ describe('ModelError', () => {
   })
 })
 
+describe('UniqueError', () => {
+  it('test___init__', () => {
+    const error = new UniqueError('unittest', 'oops')
+
+    assert.equal(error.model, 'unittest')
+    assert.equal(error.detail, 'oops')
+    assert.ok(error instanceof ModelError)
+    assert.ok(error instanceof RelationsError)
+  })
+
+  it('test___str__', () => {
+    assert.equal(new UniqueError(new Whoops(), 'adaisy').message, 'whoops: adaisy')
+  })
+})
+
+describe('NotFoundError', () => {
+  it('test___init__', () => {
+    const error = new NotFoundError('unittest', 'none retrieved')
+
+    assert.equal(error.model, 'unittest')
+    assert.equal(error.detail, 'none retrieved')
+    assert.ok(error instanceof ModelError)
+  })
+
+  it('test___str__', () => {
+    assert.equal(new NotFoundError(new Whoops(), 'none retrieved').message, 'whoops: none retrieved')
+  })
+})
+
+describe('MultipleError', () => {
+  it('test___init__', () => {
+    const error = new MultipleError('unittest', 'more than one retrieved')
+
+    assert.equal(error.model, 'unittest')
+    assert.equal(error.detail, 'more than one retrieved')
+    assert.ok(error instanceof ModelError)
+  })
+
+  it('test___str__', () => {
+    assert.equal(new MultipleError(new Whoops(), 'more than one retrieved').message, 'whoops: more than one retrieved')
+  })
+})
+
 // --------------------------------------------------------------------------- ModelIdentity
 
 describe('ModelIdentity', () => {
@@ -323,7 +379,8 @@ describe('ModelIdentity', () => {
     assert.equal(stuff._fields.field('people')!.kind, str)
     assert.equal(stuff._fields.field('people')!.default, stuffit)
     assert.equal(stuff._id, 'name')
-    assert.deepEqual(stuff._unique, { 'id-people_id-people': ['id', 'people_id', 'people'] })
+    assert.deepEqual(stuff._titles, ['name'])
+    assert.deepEqual(stuff._unique, {})
     assert.deepEqual(stuff._order, ['+name'])
 
     const things = Things.thy()
@@ -388,6 +445,57 @@ describe('ModelIdentity', () => {
     assert.equal(Sis.thy()._fields.field('bro_id')!.tied, true)
     assert.equal(Bro.thy()._fields.field('sis_id')!.store, false)
     assert.equal(Bro.thy()._fields.field('sis_id')!.tied, true)
+
+    // an id that isn't an int is supplied by the caller
+
+    let tag = Tag.thy()
+    let field = tag._fields.field('id')!
+
+    assert.equal(tag._id, 'id')
+    assert.equal(field.auto, false)
+    assert.equal(field.none, false)
+    assert.equal(field.readonly, true)
+    assert.deepEqual(tag._titles, ['id'])
+    assert.deepEqual(tag._list, ['id'])
+    assert.deepEqual(tag._unique, {})
+    assert.deepEqual(tag._order, ['+id'])
+
+    assert.equal(tag._fields.field('label')!.readonly, null)
+
+    assert.equal(People.thy()._fields.field('id')!.auto, null)
+    assert.equal(People.thy()._fields.field('id')!.readonly, null)
+
+    tag = TagNamed.thy()
+    field = tag._fields.field('slug')!
+
+    assert.equal(tag._id, 'slug')
+    assert.equal(field.auto, false)
+    assert.equal(field.readonly, true)
+    assert.deepEqual(tag._titles, ['label'])
+    assert.deepEqual(tag._unique, { label: ['label'] })
+    assert.deepEqual(tag._order, ['-label'])
+
+    class Over extends fields({ id: { kind: str, auto: true, none: true, readonly: false }, label: str }) {}
+
+    field = Over.thy()._fields.field('id')!
+
+    assert.equal(field.auto, true)
+    assert.equal(field.none, true)
+    assert.equal(field.readonly, false)
+
+    // a dot in a model's name would break the ids built from it, seq.model.source.unum
+
+    class Dotted extends fields({ id: int, name: str }) {
+      static store = 'has.dot'
+    }
+
+    throwsModel(() => Dotted.thy(), /has\.dot: model name cannot contain '\.'/)
+
+    class Titled extends fields({ id: int, name: str }) {
+      static title = 'Titled.Dotted'
+    }
+
+    throwsModel(() => Titled.thy(), /: model name cannot contain '\.'/)
   })
 
   it('test__field_name', () => {
@@ -562,6 +670,15 @@ describe('Model', () => {
     assert.equal(model._fields.field('name').name, 'name')
     assert.equal(model._fields.field('name').kind, str)
     assert.equal(model._fields.has('nope'), false)
+
+    // a supplied id
+
+    model = new Tag('fine', 'Fine')
+    assert.equal(model.id, 'fine')
+    assert.equal(model.label, 'Fine')
+
+    model = new Tag({ id: 'fine', label: 'Fine' })
+    assert.equal(model.id, 'fine')
 
     // chunk and options
 
@@ -1881,5 +1998,144 @@ describe('Model', () => {
     assert.equal(query.model, one)
 
     assert.ok(source instanceof MockSource)
+  })
+})
+
+// --------------------------------------------------------------------------- hooks
+
+const calls: string[][] = []
+const context: Record<string, any> = {}
+
+class Hooked extends fields({ id: int, name: str, owner: str }, ModelTest) {
+  pre(action: string, ...args: any[]): void {
+    calls.push(['pre', action])
+
+    if (context.deny === action) {
+      throw new ModelError(this, `denied ${action}`)
+    }
+
+    if (context.owner && action !== 'create') {
+      this.filter({ owner: context.owner })
+    }
+  }
+
+  post(action: string, result: any, ...args: any[]): any {
+    calls.push(['post', action])
+
+    if (action === 'count' && context.double) {
+      return result * 2
+    }
+
+    return result
+  }
+}
+
+class Journal extends ModelTest {
+  pre(action: string, ...args: any[]): void {
+    calls.push(['journal', action])
+    super.pre(action, ...args)
+  }
+}
+
+class Security extends Journal {
+  pre(action: string, ...args: any[]): void {
+    calls.push(['security', action])
+    super.pre(action, ...args)
+  }
+}
+
+class Chained extends fields({ id: int, name: str }, Security) {}
+
+describe('Model hooks', () => {
+  beforeEach(() => {
+    clear()
+    new MockSource('TestModel')
+    calls.length = 0
+    for (const key of Object.keys(context)) {
+      delete context[key]
+    }
+  })
+
+  it('test_defaults', async () => {
+    const unit = new Unit('yep')
+
+    assert.equal(unit.pre('create'), undefined)
+    assert.equal(unit.post('create', 'result'), 'result')
+  })
+
+  it('test_order', async () => {
+    await new Hooked('a', { owner: 'pat' }).create()
+    await Hooked.one({ name: 'a' }).retrieve()
+
+    assert.deepEqual(calls, [
+      ['pre', 'create'],
+      ['post', 'create'],
+      ['pre', 'retrieve'],
+      ['post', 'retrieve']
+    ])
+  })
+
+  it('test_actions', async () => {
+    const hooked: any = await new Hooked('a', { owner: 'pat' }).create()
+    await Hooked.many().count()
+    await Hooked.many().titles()
+    hooked.name = 'b'
+    await hooked.update()
+    await hooked.delete()
+
+    assert.deepEqual(
+      calls.filter((call) => call[0] === 'pre').map((call) => call[1]),
+      ['create', 'count', 'titles', 'update', 'delete']
+    )
+  })
+
+  it('test_deny', async () => {
+    context.deny = 'create'
+    await assert.rejects(() => new Hooked('a').create(), /denied create/)
+    assert.deepEqual(calls, [['pre', 'create']])
+
+    delete context.deny
+    assert.equal(await Hooked.many().count(), 0)
+  })
+
+  it('test_rewrite', async () => {
+    await new Hooked('a', { owner: 'pat' }).create()
+    await new Hooked('b', { owner: 'sam' }).create()
+    await new Hooked('c', { owner: 'pat' }).create()
+
+    context.owner = 'pat'
+
+    assert.deepEqual(((await Hooked.many().retrieve()) as any).name, ['a', 'c'])
+    assert.equal(await Hooked.many().count(), 2)
+    assert.equal(await Hooked.one({ name: 'b' }).retrieve(false), null)
+  })
+
+  it('test_rewrite_bulk', async () => {
+    await new Hooked('a', { owner: 'pat' }).create()
+    await new Hooked('b', { owner: 'sam' }).create()
+
+    context.owner = 'pat'
+
+    assert.equal(await Hooked.many().set({ name: 'z' }).update(), 1)
+    assert.equal(await Hooked.many().delete(), 1)
+
+    delete context.owner
+    assert.deepEqual(((await Hooked.many().retrieve()) as any).name, ['b'])
+  })
+
+  it('test_post', async () => {
+    await new Hooked('a').create()
+    context.double = true
+
+    assert.equal(await Hooked.many().count(), 2)
+  })
+
+  it('test_chain', async () => {
+    await new Chained('a').create()
+
+    assert.deepEqual(calls, [
+      ['security', 'create'],
+      ['journal', 'create']
+    ])
   })
 })
