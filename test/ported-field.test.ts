@@ -694,6 +694,16 @@ describe('Field (ported)', () => {
       assert.deepEqual(values, {})
       assert.equal(field.original, null)
     })
+
+    it('writes a readonly field once', () => {
+      const field = new Field(str, { store: 'slug', readonly: true })
+
+      field.value = 'yes'
+      const values: Record<string, any> = {}
+      field.create(values)
+      assert.deepEqual(values, { slug: 'yes' })
+      assert.equal(field.original, 'yes')
+    })
   })
 
   describe('retrieve', () => {
@@ -1001,6 +1011,27 @@ describe('Field (ported)', () => {
       assert.deepEqual(values, { ip: { address: '1.2.3.4', value: 16909060 } })
       assert.deepEqual(field.original, { address: '1.2.3.4', value: 16909060 })
     })
+
+    it('never writes a readonly field, and snaps an edit back to what is stored', () => {
+      let field = new Field(str, { store: 'slug', readonly: true })
+
+      field.value = 'yes'
+      field.original = 'no'
+      let values: Record<string, any> = {}
+      field.update(values)
+      assert.deepEqual(values, {})
+      assert.equal(field.original, 'no')
+      assert.equal(field.value, 'no')
+      assert.equal(field.changed, false)
+
+      field = new Field(str, { store: 'slug', readonly: true })
+
+      field.value = 'yes'
+      values = {}
+      field.update(values)
+      assert.deepEqual(values, {})
+      assert.equal(field.value, 'yes')
+    })
   })
 
   describe('mass', () => {
@@ -1040,6 +1071,15 @@ describe('Field (ported)', () => {
 
       ;(field as any).inject = true
       throwsField(() => field.mass({}), /no mass update with inject/)
+    })
+
+    it('skips a readonly field', () => {
+      const field = new Field(str, { store: 'slug', readonly: true })
+
+      field.value = 'yes'
+      const values: Record<string, any> = {}
+      field.mass(values)
+      assert.deepEqual(values, {})
     })
   })
 

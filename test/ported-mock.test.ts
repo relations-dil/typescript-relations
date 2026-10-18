@@ -33,6 +33,8 @@ import {
   MockSource,
   Model,
   ModelError,
+  MultipleError,
+  NotFoundError,
   OneToMany,
   OneToOne,
   Source,
@@ -157,6 +159,16 @@ class Plain extends fields({ simple_id: int, name: str }, SourceModel) {
 }
 
 new OneToMany(Simple, Plain)
+
+class Slug extends fields({ id: str, name: str }, SourceModel) {
+  declare piece: any
+}
+
+class Piece extends fields({ id: str, slug_id: str, name: str }, SourceModel) {
+  declare slug: any
+}
+
+new OneToMany(Slug, Piece)
 
 class Meta extends fields(
   {
@@ -396,6 +408,15 @@ describe('MockSource', () => {
     // already exist, so an untouched Case never registers.
     assert.deepEqual(uniques(), { check: { name: {} } })
     assert.equal(model._fields.field('id')!.auto, true)
+
+    class Label extends fields({ id: str, name: str }) {}
+
+    const label = new Label()
+
+    source.init(label)
+
+    assert.deepEqual(uniques().label, {})
+    assert.equal(label._fields.field('id')!.auto, false)
   })
 
   it('test_field_define', () => {
@@ -603,6 +624,26 @@ describe('MockSource', () => {
     sis._bulk = true
 
     await rejects(() => sis.create(), ModelError, 'cannot create ties in bulk')
+
+    // ids the caller supplies are the keys
+
+    const slug = new Slug('sure', 'Sure')
+    slug.piece.add('p1', { name: 'fine' })
+    await slug.create()
+
+    assert.equal(slug.id, 'sure')
+    assert.equal(slug.piece[0].slug_id, 'sure')
+    assert.equal(slug.piece[0].id, 'p1')
+    assert.equal(slug._action, 'update')
+
+    await new Slug({ id: 'more', name: 'More' }).create()
+
+    assert.deepEqual(plain().slug, {
+      sure: { id: 'sure', name: 'Sure' },
+      more: { id: 'more', name: 'More' }
+    })
+
+    await rejects(() => new Slug({ id: 'sure', name: 'Dupe' }).create(), UniqueError, 'violates unique')
   })
 
   it('test_model_like', async () => {
@@ -698,13 +739,13 @@ describe('MockSource', () => {
 
     await rejects(
       () => Unit.one({ name__in: ['people', 'stuff'] }).retrieve(),
-      ModelError,
+      MultipleError,
       'unit: more than one retrieved'
     )
 
     const missing = Unit.one({ name: 'things' })
 
-    await rejects(() => missing.retrieve(), ModelError, 'unit: none retrieved')
+    await rejects(() => missing.retrieve(), NotFoundError, 'unit: none retrieved')
 
     assert.equal(await missing.retrieve(false), null)
 
@@ -837,6 +878,17 @@ describe('MockSource', () => {
     assert.equal((await Bro.many({ sis_id: [dot.id] }).retrieve())![0].name, 'Harry')
 
     assert.equal((await Sis.many({ bro_id: [999] }).retrieve())!.size, 0)
+
+    const slug = new Slug('sure', 'Sure')
+    slug.piece.add('p1', { name: 'fine' })
+    await slug.create()
+    await new Slug({ id: 'more', name: 'More' }).create()
+
+    assert.equal((await Slug.one('sure').retrieve())!.name, 'Sure')
+    assert.equal((await Slug.one({ id: 'more' }).retrieve())!.name, 'More')
+    assert.deepEqual(((await Slug.many().retrieve()) as any).id, ['more', 'sure'])
+    assert.equal((await (await Slug.one('sure').retrieve())!.piece.retrieve())[0].name, 'fine')
+    assert.equal((await (await Piece.one('p1').retrieve())!.slug.retrieve()).name, 'Sure')
   })
 
   it('test_retrieve_ties_query', async () => {
@@ -1050,6 +1102,25 @@ describe('MockSource', () => {
     ])
     assert.deepEqual((await (await Bro.one({ name: 'Dick' }).retrieve())!.sis.retrieve()).id, [dot.id])
     assert.deepEqual((await (await Sis.one({ name: 'Nikki' }).retrieve())!.bro.retrieve()).id, [tom.id])
+
+    await new Slug({ id: 'sure', name: 'Sure' }).create()
+    await new Slug({ id: 'more', name: 'More' }).create()
+
+    assert.equal(await (await Slug.one('sure').retrieve())!.set({ name: 'Changed' }).update(), 1)
+    assert.equal((await Slug.one('sure').retrieve())!.name, 'Changed')
+
+    // a supplied id is readonly, an edit snaps back to what is stored
+
+    const slug: any = await Slug.one('sure').retrieve()
+    slug.id = 'renamed'
+    slug.name = 'Again'
+    await slug.update()
+    assert.equal(slug.id, 'sure')
+    assert.equal((await Slug.one('sure').retrieve())!.name, 'Again')
+    assert.equal(plain().slug.sure.id, 'sure')
+
+    assert.equal(await Slug.many({ id__in: ['more', 'sure'] }).set({ name: 'Mass' }).update(), 2)
+    assert.equal((await Slug.one('more').retrieve())!.name, 'Mass')
   })
 
   it('test_delete_query', () => {
@@ -1117,6 +1188,13 @@ describe('MockSource', () => {
     assert.deepEqual((await (await Bro.one({ name: 'Tom' }).retrieve())!.sis.retrieve()).id, [dot.id])
     assert.deepEqual((await (await Sis.one({ name: 'Dot' }).retrieve())!.bro.retrieve()).id, [tom.id])
     assert.equal(await SisBro.many().count(), 1)
+
+    await new Slug({ id: 'sure', name: 'Sure' }).create()
+    await new Slug({ id: 'more', name: 'More' }).create()
+
+    assert.equal(await Slug.one('more').delete(), 1)
+    assert.deepEqual(((await Slug.many().retrieve()) as any).id, ['sure'])
+    assert.equal('more' in plain().slug, false)
   })
 
   it('test_definition', async () => {

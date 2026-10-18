@@ -34,7 +34,17 @@ import * as overscore from './overscore.js'
 
 export { overscore }
 
-export { FieldError, MigrationsError, ModelError, RecordError, SourceError, UniqueError } from './errors.js'
+export {
+  FieldError,
+  MigrationsError,
+  ModelError,
+  MultipleError,
+  NotFoundError,
+  RecordError,
+  RelationsError,
+  SourceError,
+  UniqueError
+} from './errors.js'
 export { OverscoreError } from './overscore.js'
 
 export {

@@ -15,6 +15,8 @@ import {
   MockSource,
   Model,
   ModelError,
+  MultipleError,
+  NotFoundError,
   OneToMany,
   OneToOne,
   RestSource,
@@ -694,14 +696,14 @@ describe('RestSource', () => {
 
       await assert.rejects(
         () => Unit.one({ name__in: ['people', 'stuff'] }).retrieve(),
-        (error: any) => error instanceof ModelError && error.message === 'unit: more than one retrieved'
+        (error: any) => error instanceof MultipleError && error.message === 'unit: more than one retrieved'
       )
 
       const model = Unit.one({ name: 'things' })
 
       await assert.rejects(
         () => model.retrieve(),
-        (error: any) => error instanceof ModelError && error.message === 'unit: none retrieved'
+        (error: any) => error instanceof NotFoundError && error.message === 'unit: none retrieved'
       )
 
       assert.equal(await model.retrieve(false), null)

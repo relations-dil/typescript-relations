@@ -12,7 +12,7 @@
  */
 
 import * as overscore from './overscore.js'
-import { ModelError, UniqueError } from './errors.js'
+import { ModelError, MultipleError, NotFoundError, UniqueError } from './errors.js'
 import { Source, type Query } from './source.js'
 import { Titles } from './titles.js'
 import { clone, joinPath, stable } from './util.js'
@@ -52,9 +52,9 @@ export class MockSource extends Source {
   /** Last id handed out, keyed by model name. */
   ids: globalThis.Record<string, number> = {}
   /** Records keyed by id, keyed by model name. */
-  data: globalThis.Record<string, Map<number, Stored>> = {}
+  data: globalThis.Record<string, Map<number | string, Stored>> = {}
   /** Unique index values keyed by id, keyed by index, keyed by model name. */
-  unique: globalThis.Record<string, globalThis.Record<string, Map<number, string>>> = {}
+  unique: globalThis.Record<string, globalThis.Record<string, Map<number | string, string>>> = {}
   /** Migrations applied so far, or null when nothing has been loaded. */
   migrations: string[] | null = null
 
@@ -156,7 +156,7 @@ export class MockSource extends Source {
   }
 
   /** Check every unique index, recording the new value or throwing. */
-  uniques(model: Model, values: Stored, id: number): void {
+  uniques(model: Model, values: Stored, id: number | string): void {
     const name = model.NAME as string
 
     for (const [unique, fields] of Object.entries(model._unique)) {
@@ -211,14 +211,27 @@ export class MockSource extends Source {
 
         this.ids[name] += 1
 
-        this.uniques(model, values, this.ids[name])
+        const idField = model._id !== null ? (model._fields.field(model._id) as Field) : null
 
-        if (model._id !== null && (values[model._id] ?? null) === null) {
-          values[(model._fields.field(model._id) as Field).store as string] = this.ids[name]
-          ;(creating as any)[model._id] = this.ids[name]
+        let key: number | string = this.ids[name]
+
+        // Ids the caller supplies (slugs) are the keys, else it's the next number.
+        if (idField !== null && !idField.auto) {
+          key = values[idField.store as string]
+
+          if (key === null || key === undefined || this.data[name].has(key)) {
+            throw new UniqueError(model, `value ${JSON.stringify(key ?? null)} violates unique ${model._id}`)
+          }
         }
 
-        this.data[name].set(this.ids[name], MockSource.extract(creating, values))
+        this.uniques(model, values, key)
+
+        if (idField !== null && idField.auto && (values[model._id as string] ?? null) === null) {
+          values[idField.store as string] = key
+          ;(creating as any)[model._id as string] = key
+        }
+
+        this.data[name].set(key, MockSource.extract(creating, values))
 
         if (!model._bulk) {
           if (model._id) {
@@ -337,13 +350,13 @@ export class MockSource extends Source {
     }
 
     if (model._mode === 'one' && matches.length > 1) {
-      throw new ModelError(model, 'more than one retrieved')
+      throw new MultipleError(model, 'more than one retrieved')
     }
 
     if (model._mode === 'one' && model._role !== 'child') {
       if (matches.length < 1) {
         if (verify) {
-          throw new ModelError(model, 'none retrieved')
+          throw new NotFoundError(model, 'none retrieved')
         }
 
         return null
@@ -453,7 +466,7 @@ export class MockSource extends Source {
   async delete(model: Model): Promise<number> {
     return this.rolling(async () => {
       const name = model.NAME as string
-      const ids: number[] = []
+      const ids: Array<number | string> = []
 
       if (model._action === 'retrieve') {
         for (const [id, record] of this.data[name]) {
