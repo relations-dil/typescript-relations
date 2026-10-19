@@ -43,8 +43,19 @@ done
 exit 0
 EOF
 chmod +x "$T/bin/make"
+
+# the stub docker, for verify: it fails the first DOCKER_FAILS times it's run, and logs each run
+cat > "$T/bin/docker" << 'EOF'
+#!/bin/sh
+echo "docker $*" >> "$DOCKER_LOG"
+count=$(wc -l < "$DOCKER_LOG" | tr -d ' ')
+[ "$count" -le "${DOCKER_FAILS:-0}" ] && exit 1
+exit 0
+EOF
+chmod +x "$T/bin/docker"
 export PATH="$T/bin:$PATH"
 export MAKE_LOG=$T/make.log
+export DOCKER_LOG=$T/docker.log
 
 # ---- helpers
 
@@ -389,6 +400,27 @@ git switch -q -c elsewhere
 run sh scripts/release.sh
 eq "release refuses off main" 1 "$CODE"
 eq "release off main runs no make" "" "$(cat "$MAKE_LOG")"
+
+# ---- verify.sh
+
+echo "== verify.sh"
+fresh
+: > "$DOCKER_LOG"
+run sh scripts/verify.sh
+eq "verify passes when the install does" 0 "$CODE"
+eq "verify runs the install once" "1" "$(wc -l < "$DOCKER_LOG" | tr -d ' ')"
+has "verify installs the package at the version" "pkg@0.6.1" "$(cat "$DOCKER_LOG")"
+
+: > "$DOCKER_LOG"
+DOCKER_FAILS=1 run sh scripts/verify.sh
+eq "verify tries again while the registry catches up" 0 "$CODE"
+eq "verify ran the install twice" "2" "$(wc -l < "$DOCKER_LOG" | tr -d ' ')"
+
+: > "$DOCKER_LOG"
+DOCKER_FAILS=9 run sh scripts/verify.sh
+eq "verify gives up" 1 "$CODE"
+eq "verify gave up after WAIT_TRIES" "2" "$(wc -l < "$DOCKER_LOG" | tr -d ' ')"
+has "verify says why" "pkg 0.6.1 could not be installed from npm" "$OUT"
 
 # ---- lib.sh
 
