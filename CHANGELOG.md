@@ -5,6 +5,14 @@ All notable changes to this project are recorded here, newest first. Format foll
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-18
+
+### Added
+- A `prepare` script builds the package when there is source to build, so a dependent can pin a commit (`git+https://github.com/relations-dil/typescript-relations.git#<hash>`) and test against it before a release, the way the Python repos pin a hash in `requirements.txt`. The `Dockerfile` installs before the source is copied in, so there it has nothing to build and does nothing. `make release-check` refuses a release while a dependency is a pin.
+
+### Fixed
+- The clean-install check in `scripts/verify.sh` tries again while the registry catches up. The first release of `@relations-dil/unifist` stopped after its publish on a 404 from npm's package page, while the version page already answered. `make test-release` covers it.
+
 ## [0.2.3] - 2026-10-18
 
 Parity with python-relations 0.6.20, the four releases since 0.6.16, and the release tooling the Python repos have.

@@ -955,6 +955,10 @@ make test-release         # tests the scripts against a throwaway repo and a fak
 is out and tagged it does nothing. It needs `~/.npmrc` with a token that can publish. The Jenkins
 build runs it on `main`, so merging a pull request with an unreleased `VERSION` releases it.
 
+A dependent can test against a commit before a release by pinning it, `"@relations-dil/relations":
+"git+https://github.com/relations-dil/typescript-relations.git#<hash>"`: npm builds the package on install (`prepare`).
+`make release-check` refuses to release while a dependency is a pin like that, so it becomes a version again first.
+
 No runtime dependencies.
 
 ## License
