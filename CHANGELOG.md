@@ -5,6 +5,9 @@ All notable changes to this project are recorded here, newest first. Format foll
 
 ## [Unreleased]
 
+### Changed
+- The README says how to use `RestSource` with an API that serves its models under `/model`, as relations-unifist does: put `/model` on the end of the `url`. No code change.
+
 ## [0.2.4] - 2026-10-18
 
 ### Added

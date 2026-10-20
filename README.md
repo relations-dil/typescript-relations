@@ -893,6 +893,14 @@ body with a GET, and relations-restx treats a POST that carries a `filter` exact
 are `PATCH /<endpoint>/<id>` with `{singular: {...}}`, mass updates are `PATCH /<endpoint>` with
 `{filter, plural: {...}}`, and deletes are `DELETE /<endpoint>` with `{filter}`.
 
+An API that serves its models under `/model`, as [relations-unifist](https://github.com/relations-dil/python-relations-unifist)
+does (`/model/<singular>` and `/model/<singular>/<id>`), needs no other source: give it the url with `/model`
+on the end, and `ENDPOINT` stays relative to that. It takes the same reads, creates, updates and deletes.
+
+```ts
+new RestSource('example', { url: 'https://api.example.com/model' })   // POST https://api.example.com/model/unit
+```
+
 A response of 400 or more throws a `ModelError` carrying the API's `message` (or `API Error`). An
 `overflow` in a response is carried onto the model. Sets go over as sorted lists. Like the Python
 client, it never asks the API for more than the model's `limit()`, but restx always applies one
