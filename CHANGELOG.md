@@ -6,6 +6,9 @@ All notable changes to this project are recorded here, newest first. Format foll
 ## [Unreleased]
 
 ### Changed
+- Checks before a release: a scoped package's slash is encoded when the registry is asked about it, `package-lock.json` has to be at `VERSION` along with `package.json`, and the floor of each dependency and peer dependency has to be published on npm already. The release scripts and their tests are the same in every TypeScript repo.
+
+### Changed
 - `make release-check` and `make release` don't run `build`, `test`, `lint` and `setup` again, only the `pack`: the Jenkins stages have just run them before the release stage, so it was the same work twice. Run them yourself before checking by hand, as `make release-check` is only the checks now (relations-dil/python-relations#90).
 - The README says how to use `RestSource` with an API that serves its models under `/model`, as relations-unifist does: put `/model` on the end of the `url`. No code change.
 
